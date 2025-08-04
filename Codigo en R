@@ -1,0 +1,624 @@
+datos$Genero <- as.factor(datos$Genero)
+datos$EstadoCivil <- as.factor(datos$EstadoCivil)
+
+# Crear variables dummy para Género
+datos$femenino <- ifelse(datos$Genero == "Mujer", 1, 0)
+datos$masculino <- ifelse(datos$Genero == "Hombre", 1, 0)
+
+# Crear variables dummy para Estado Civil
+# Asumiendo que "Separado" en tus datos de origen debe ser "Divorciado" en las columnas dummy
+datos$Casado <- ifelse(datos$EstadoCivil == "Casado", 1, 0)
+datos$Soltero <- ifelse(datos$EstadoCivil == "Soltero", 1, 0)
+datos$Divorciado <- ifelse(datos$EstadoCivil == "Separado", 1, 0) # Si "Separado" es el valor en la columna original
+
+# Eliminar las columnas originales de Género y EstadoCivil
+datos$EstadoCivil <- NULL
+datos$Genero <- NULL
+
+# Identificar y eliminar filas duplicadas
+variables_para_duplicados <- c(
+  "Hijos",
+  "Escolaridad",
+  "femenino",
+  "masculino",
+  "Casado",
+  "Soltero",
+  "Divorciado"
+)
+
+filas_a_eliminar <- duplicated(datos[, variables_para_duplicados])
+datos_limpios <- datos[!filas_a_eliminar, ]
+
+datos <- datos_limpios # Usar el data frame limpio para los análisis posteriores
+
+# Preparar sub-dataframes por género
+datos_femeninos <- datos[datos$femenino == 1, ]
+datos_masculinos <- datos[datos$masculino == 1, ]
+
+# Definir valores únicos globales y de grupo para ejes y dimensiones de matrices
+hijos_unicos_total <- sort(unique(datos$Hijos))
+escolaridad_unicos_total <- sort(unique(datos$Escolaridad))
+generos_columnas <- c("Mujer", "Hombre")
+estados_civiles_columnas <- c("Soltero", "Casado", "Divorciado")
+
+hijos_unicos_femeninos <- sort(unique(datos_femeninos$Hijos))
+escolaridad_unicos_femeninos <- sort(unique(datos_femeninos$Escolaridad))
+
+hijos_unicos_masculinos <- sort(unique(datos_masculinos$Hijos))
+escolaridad_unicos_masculinos <- sort(unique(datos_masculinos$Escolaridad))
+
+# --- Cálculos de Covarianza y Correlación (No son gráficos pero están en tu código de preparación) ---
+
+columnas_para_matrices <- c(
+  "Hijos",
+  "Escolaridad",
+  "femenino",
+  "masculino",
+  "Casado",
+  "Soltero",
+  "Divorciado"
+)
+
+matriz_covarianza <- cov(datos[, columnas_para_matrices])
+print("--- Matriz de Covarianza ---")
+print(round(matriz_covarianza, 3))
+
+matriz_correlacion <- cor(datos[, columnas_para_matrices])
+print("--- Matriz de Correlación ---")
+print(round(matriz_correlacion, 3))
+
+# --- 1. Gráfico: "¿Quién tiene más hijos, las mujeres o los hombres?" ---
+# Matriz: Hijos (Filas) x Género (Columnas)
+
+conteo_matrix_hijos_genero <- matrix(0,
+                                     nrow = length(hijos_unicos_total),
+                                     ncol = length(generos_columnas),
+                                     dimnames = list(hijos_unicos_total, generos_columnas))
+
+for (i in 1:nrow(datos)) {
+  hijos_actual_val <- as.character(datos$Hijos[i])
+  
+  genero_actual_val <- NA
+  if (datos$femenino[i] == 1) { genero_actual_val <- "Mujer"
+  } else if (datos$masculino[i] == 1) { genero_actual_val <- "Hombre" }
+  
+  if (!is.na(genero_actual_val) &&
+      hijos_actual_val %in% dimnames(conteo_matrix_hijos_genero)[[1]] &&
+      genero_actual_val %in% dimnames(conteo_matrix_hijos_genero)[[2]]) {
+    
+    conteo_matrix_hijos_genero[hijos_actual_val, genero_actual_val] <- conteo_matrix_hijos_genero[hijos_actual_val, genero_actual_val] + 1
+  }
+}
+print(conteo_matrix_hijos_genero)
+
+colores_genero_plot1 <- c("deeppink", "steelblue") # Colores para Mujer y Hombre
+ltys_genero_plot1 <- 1:length(generos_columnas)
+pchs_genero_plot1 <- 15:(15 + length(generos_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_hijos_genero)),
+     y = conteo_matrix_hijos_genero[, 1],
+     type = "b",
+     xlab = "Cantidad de Hijos",
+     ylab = "Cantidad de Personas",
+     main = "¿Quién tiene más hijos, las mujeres o los hombres?",
+     xlim = c(min(hijos_unicos_total), max(hijos_unicos_total)),
+     ylim = c(0, max(conteo_matrix_hijos_genero) * 1.1),
+     col = colores_genero_plot1[1],
+     pch = pchs_genero_plot1[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = 0:max(hijos_unicos_total))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_hijos_genero) * 1.1, by = 1))
+
+grid(nx = length(hijos_unicos_total),
+     ny = floor(max(conteo_matrix_hijos_genero) * 1.1),
+     col = "lightgray",
+     lty = "dotted",
+     lwd = 1)
+
+for (j in 2:ncol(conteo_matrix_hijos_genero)) {
+  lines(x = as.numeric(rownames(conteo_matrix_hijos_genero)),
+        y = conteo_matrix_hijos_genero[, j],
+        col = colores_genero_plot1[j],
+        pch = pchs_genero_plot1[j],
+        type = "b",
+        lwd = 2)
+}
+legend("topright",
+       legend = colnames(conteo_matrix_hijos_genero),
+       col = colores_genero_plot1,
+       lty = ltys_genero_plot1,
+       pch = pchs_genero_plot1,
+       lwd = 2,
+       title = "Género")
+
+# --- 2. Gráfico: "¿Qué diferencia hay entre los estados civiles?" ---
+# Matriz: Género (Filas) x Estado Civil (Columnas) - BARPLOT
+
+conteo_matrix_genero_ec <- matrix(0,
+                                  nrow = length(generos_columnas),
+                                  ncol = length(estados_civiles_columnas),
+                                  dimnames = list(generos_columnas, estados_civiles_columnas))
+
+for (i in 1:nrow(datos)) {
+  estado_civil_actual_val <- NA
+  if (datos$Soltero[i] == 1) { estado_civil_actual_val <- "Soltero"
+  } else if (datos$Casado[i] == 1) { estado_civil_actual_val <- "Casado"
+  } else if (datos$Divorciado[i] == 1) { estado_civil_actual_val <- "Divorciado" }
+  
+  genero_actual_val <- NA
+  if (datos$femenino[i] == 1) { genero_actual_val <- "Mujer"
+  } else if (datos$masculino[i] == 1) { genero_actual_val <- "Hombre" }
+  
+  if (!is.na(estado_civil_actual_val) && !is.na(genero_actual_val) &&
+      genero_actual_val %in% dimnames(conteo_matrix_genero_ec)[[1]] &&
+      estado_civil_actual_val %in% dimnames(conteo_matrix_genero_ec)[[2]]) {
+    
+    conteo_matrix_genero_ec[genero_actual_val, estado_civil_actual_val] <- conteo_matrix_genero_ec[genero_actual_val, estado_civil_actual_val] + 1
+  }
+}
+print(conteo_matrix_genero_ec)
+
+colores_genero_plot2 <- c("deeppink", "steelblue") # Rosa para Mujeres, Azul para Hombres
+
+barplot_result <- barplot(conteo_matrix_genero_ec,
+                          beside = TRUE,
+                          col = colores_genero_plot2,
+                          main = "¿Qué diferencia hay entre los estados civiles?",
+                          xlab = "Estado Civil",
+                          ylab = "Cantidad de Personas",
+                          ylim = c(0, max(conteo_matrix_genero_ec) * 1.2),
+                          las = 1
+)
+legend("topright",
+       legend = rownames(conteo_matrix_genero_ec),
+       fill = colores_genero_plot2,
+       title = "Género")
+
+# --- 3. Gráfico: "Que genero estudia más" ---
+# Matriz: Escolaridad (Filas) x Género (Columnas)
+
+conteo_matrix_escolaridad_genero <- matrix(0,
+                                           nrow = length(escolaridad_unicos_total),
+                                           ncol = length(generos_columnas),
+                                           dimnames = list(escolaridad_unicos_total, generos_columnas))
+
+for (i in 1:nrow(datos)) {
+  escolaridad_actual_val <- as.character(datos$Escolaridad[i])
+  
+  genero_actual_val <- NA
+  if (datos$femenino[i] == 1) { genero_actual_val <- "Mujer"
+  } else if (datos$masculino[i] == 1) { genero_actual_val <- "Hombre" }
+  
+  if (!is.na(genero_actual_val) &&
+      escolaridad_actual_val %in% dimnames(conteo_matrix_escolaridad_genero)[[1]] &&
+      genero_actual_val %in% dimnames(conteo_matrix_escolaridad_genero)[[2]]) {
+    
+    conteo_matrix_escolaridad_genero[escolaridad_actual_val, genero_actual_val] <- conteo_matrix_escolaridad_genero[escolaridad_actual_val, genero_actual_val] + 1
+  }
+}
+print(conteo_matrix_escolaridad_genero)
+
+colores_genero_plot3 <- c("deeppink", "steelblue") # Colores para Mujer y Hombre
+ltys_genero_plot3 <- 1:length(generos_columnas)
+pchs_genero_plot3 <- 15:(15 + length(generos_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_escolaridad_genero)),
+     y = conteo_matrix_escolaridad_genero[, 1],
+     type = "b",
+     xlab = "Nivel de Escolaridad",
+     ylab = "Cantidad de Personas",
+     main = "¿Qué género estudia más?",
+     xlim = c(min(escolaridad_unicos_total), max(escolaridad_unicos_total)),
+     ylim = c(0, max(conteo_matrix_escolaridad_genero) * 1.1),
+     col = colores_genero_plot3[1],
+     pch = pchs_genero_plot3[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = min(escolaridad_unicos_total):max(escolaridad_unicos_total))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_escolaridad_genero) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_escolaridad_genero)) {
+  lines(x = as.numeric(rownames(conteo_matrix_escolaridad_genero)),
+        y = conteo_matrix_escolaridad_genero[, j],
+        col = colores_genero_plot3[j],
+        pch = pchs_genero_plot3[j],
+        type = "b",
+        lwd = 2)
+}
+legend("topright",
+       legend = colnames(conteo_matrix_escolaridad_genero),
+       col = colores_genero_plot3,
+       lty = ltys_genero_plot3,
+       pch = pchs_genero_plot3,
+       lwd = 2,
+       title = "Género")
+
+# --- 4. Gráfico: "De los hombres ¿Qué estado civil tiene más hijos?" ---
+# Matriz: Hijos (Filas) x Estado Civil (Columnas) para HOMBRES
+
+conteo_matrix_masculino_hijos_ec <- matrix(0,
+                                           nrow = length(hijos_unicos_masculinos),
+                                           ncol = length(estados_civiles_columnas),
+                                           dimnames = list(hijos_unicos_masculinos, estados_civiles_columnas))
+
+for (i in 1:nrow(datos_masculinos)) {
+  hijo_actual_val <- as.character(datos_masculinos$Hijos[i])
+  
+  estado_civil_actual_val <- NA
+  if (datos_masculinos$Soltero[i] == 1) { estado_civil_actual_val <- "Soltero"
+  } else if (datos_masculinos$Casado[i] == 1) { estado_civil_actual_val <- "Casado"
+  } else if (datos_masculinos$Divorciado[i] == 1) { estado_civil_actual_val <- "Divorciado" }
+  
+  if (!is.na(estado_civil_actual_val) &&
+      hijo_actual_val %in% dimnames(conteo_matrix_masculino_hijos_ec)[[1]] &&
+      estado_civil_actual_val %in% dimnames(conteo_matrix_masculino_hijos_ec)[[2]]) {
+    
+    conteo_matrix_masculino_hijos_ec[hijo_actual_val, estado_civil_actual_val] <- conteo_matrix_masculino_hijos_ec[hijo_actual_val, estado_civil_actual_val] + 1
+  }
+}
+print(conteo_matrix_masculino_hijos_ec)
+
+colores_masculinos_ec_hijos_plot4 <- rainbow(length(estados_civiles_columnas))
+ltys_masculinos_ec_hijos_plot4 <- 1:length(estados_civiles_columnas)
+pchs_masculinos_ec_hijos_plot4 <- 15:(15 + length(estados_civiles_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_masculino_hijos_ec)),
+     y = conteo_matrix_masculino_hijos_ec[, 1],
+     type = "b",
+     xlab = "Cantidad de Hijos",
+     ylab = "Cantidad de Hombres",
+     main = "De los hombres ¿Qué estado civil tiene más hijos?",
+     xlim = c(min(hijos_unicos_masculinos), max(hijos_unicos_masculinos)),
+     ylim = c(0, max(conteo_matrix_masculino_hijos_ec) * 1.1),
+     col = colores_masculinos_ec_hijos_plot4[1],
+     pch = pchs_masculinos_ec_hijos_plot4[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = 0:max(hijos_unicos_masculinos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_masculino_hijos_ec) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_masculino_hijos_ec)) {
+  lines(x = as.numeric(rownames(conteo_matrix_masculino_hijos_ec)),
+        y = conteo_matrix_masculino_hijos_ec[, j],
+        col = colores_masculinos_ec_hijos_plot4[j],
+        pch = pchs_masculinos_ec_hijos_plot4[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = colnames(conteo_matrix_masculino_hijos_ec),
+       col = colores_masculinos_ec_hijos_plot4,
+       lty = ltys_masculinos_ec_hijos_plot4,
+       pch = pchs_masculinos_ec_hijos_plot4,
+       lwd = 2,
+       title = "Estado Civil")
+
+# --- 5. Gráfico: "De las mujeres ¿Qué estado civil tiene más hijos?" ---
+# Matriz: Hijos (Filas) x Estado Civil (Columnas) para MUJERES
+
+conteo_matrix_femenina_hijos_ec <- matrix(0,
+                                          nrow = length(hijos_unicos_femeninos),
+                                          ncol = length(estados_civiles_columnas),
+                                          dimnames = list(hijos_unicos_femeninos, estados_civiles_columnas))
+
+for (i in 1:nrow(datos_femeninos)) {
+  hijo_actual_val <- as.character(datos_femeninos$Hijos[i])
+  
+  estado_civil_actual_val <- NA
+  if (datos_femeninos$Soltero[i] == 1) { estado_civil_actual_val <- "Soltero"
+  } else if (datos_femeninos$Casado[i] == 1) { estado_civil_actual_val <- "Casado"
+  } else if (datos_femeninos$Divorciado[i] == 1) { estado_civil_actual_val <- "Divorciado" }
+  
+  if (!is.na(estado_civil_actual_val) &&
+      hijo_actual_val %in% dimnames(conteo_matrix_femenina_hijos_ec)[[1]] &&
+      estado_civil_actual_val %in% dimnames(conteo_matrix_femenina_hijos_ec)[[2]]) {
+    
+    conteo_matrix_femenina_hijos_ec[hijo_actual_val, estado_civil_actual_val] <- conteo_matrix_femenina_hijos_ec[hijo_actual_val, estado_civil_actual_val] + 1
+  }
+}
+print(conteo_matrix_femenina_hijos_ec)
+
+colores_femeninos_ec_hijos_plot5 <- rainbow(length(estados_civiles_columnas))
+ltys_femeninos_ec_hijos_plot5 <- 1:length(estados_civiles_columnas)
+pchs_femeninos_ec_hijos_plot5 <- 15:(15 + length(estados_civiles_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_femenina_hijos_ec)),
+     y = conteo_matrix_femenina_hijos_ec[, 1],
+     type = "b",
+     xlab = "Cantidad de Hijos",
+     ylab = "Cantidad de Mujeres",
+     main = "De las mujeres ¿Qué estado civil tiene más hijos?",
+     xlim = c(min(hijos_unicos_femeninos), max(hijos_unicos_femeninos)),
+     ylim = c(0, max(conteo_matrix_femenina_hijos_ec) * 1.1),
+     col = colores_femeninos_ec_hijos_plot5[1],
+     pch = pchs_femeninos_ec_hijos_plot5[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = 0:max(hijos_unicos_femeninos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_femenina_hijos_ec) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_femenina_hijos_ec)) {
+  lines(x = as.numeric(rownames(conteo_matrix_femenina_hijos_ec)),
+        y = conteo_matrix_femenina_hijos_ec[, j],
+        col = colores_femeninos_ec_hijos_plot5[j],
+        pch = pchs_femeninos_ec_hijos_plot5[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = colnames(conteo_matrix_femenina_hijos_ec),
+       col = colores_femeninos_ec_hijos_plot5,
+       lty = ltys_femeninos_ec_hijos_plot5,
+       pch = pchs_femeninos_ec_hijos_plot5,
+       lwd = 2,
+       title = "Estado Civil")
+
+# --- 6. Gráfico: "En los hombres ¿El estado civil influye en el estudio?" ---
+# Matriz: Escolaridad (Filas) x Estado Civil (Columnas) para HOMBRES
+
+conteo_matrix_masculino_ec <- matrix(0,
+                                     nrow = length(escolaridad_unicos_masculinos),
+                                     ncol = length(estados_civiles_columnas),
+                                     dimnames = list(escolaridad_unicos_masculinos, estados_civiles_columnas))
+
+for (i in 1:nrow(datos_masculinos)) {
+  escolaridad_actual <- as.character(datos_masculinos$Escolaridad[i])
+  
+  estado_civil_actual <- NA
+  if (datos_masculinos$Soltero[i] == 1) { estado_civil_actual <- "Soltero"
+  } else if (datos_masculinos$Casado[i] == 1) { estado_civil_actual <- "Casado"
+  } else if (datos_masculinos$Divorciado[i] == 1) { estado_civil_actual <- "Divorciado" }
+  
+  if (!is.na(estado_civil_actual) && escolaridad_actual %in% dimnames(conteo_matrix_masculino_ec)[[1]] &&
+      estado_civil_actual %in% dimnames(conteo_matrix_masculino_ec)[[2]]) {
+    conteo_matrix_masculino_ec[escolaridad_actual, estado_civil_actual] <- conteo_matrix_masculino_ec[escolaridad_actual, estado_civil_actual] + 1
+  }
+}
+print(conteo_matrix_masculino_ec)
+
+colores_masculino_ec_plot6 <- rainbow(length(estados_civiles_columnas))
+ltys_masculino_ec_plot6 <- 1:length(estados_civiles_columnas)
+pchs_masculino_ec_plot6 <- 15:(15 + length(estados_civiles_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_masculino_ec)),
+     y = conteo_matrix_masculino_ec[, 1],
+     type = "b",
+     xlab = "Nivel de Escolaridad",
+     ylab = "Cantidad de Hombres",
+     main = "En los hombres ¿El estado civil influye en el estudio?",
+     xlim = c(min(escolaridad_unicos_masculinos), max(escolaridad_unicos_masculinos)),
+     ylim = c(0, max(conteo_matrix_masculino_ec) * 1.1),
+     col = colores_masculino_ec_plot6[1],
+     pch = pchs_masculino_ec_plot6[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = min(escolaridad_unicos_masculinos):max(escolaridad_unicos_masculinos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_masculino_ec) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_masculino_ec)) {
+  lines(x = as.numeric(rownames(conteo_matrix_masculino_ec)),
+        y = conteo_matrix_masculino_ec[, j],
+        col = colores_masculino_ec_plot6[j],
+        pch = pchs_masculino_ec_plot6[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = colnames(conteo_matrix_masculino_ec),
+       col = colores_masculino_ec_plot6,
+       lty = ltys_masculino_ec_plot6,
+       pch = pchs_masculino_ec_plot6,
+       lwd = 2,
+       title = "Estado Civil")
+
+# --- 7. Gráfico: "En las mujeres ¿El estado civil influye en el estudio?" ---
+# Matriz: Escolaridad (Filas) x Estado Civil (Columnas) para MUJERES
+
+conteo_matrix_femenina_ec <- matrix(0,
+                                    nrow = length(escolaridad_unicos_femeninos),
+                                    ncol = length(estados_civiles_columnas),
+                                    dimnames = list(escolaridad_unicos_femeninos, estados_civiles_columnas))
+
+for (i in 1:nrow(datos_femeninos)) {
+  escolaridad_actual <- as.character(datos_femeninos$Escolaridad[i])
+  
+  estado_civil_actual <- NA
+  if (datos_femeninos$Soltero[i] == 1) { estado_civil_actual <- "Soltero"
+  } else if (datos_femeninos$Casado[i] == 1) { estado_civil_actual <- "Casado"
+  } else if (datos_femeninos$Divorciado[i] == 1) { estado_civil_actual <- "Divorciado" }
+  
+  if (!is.na(estado_civil_actual) && escolaridad_actual %in% dimnames(conteo_matrix_femenina_ec)[[1]] &&
+      estado_civil_actual %in% dimnames(conteo_matrix_femenina_ec)[[2]]) {
+    conteo_matrix_femenina_ec[escolaridad_actual, estado_civil_actual] <- conteo_matrix_femenina_ec[escolaridad_actual, estado_civil_actual] + 1
+  }
+}
+print(conteo_matrix_femenina_ec)
+
+colores_femeninos_ec_plot7 <- rainbow(length(estados_civiles_columnas))
+ltys_femeninos_ec_plot7 <- 1:length(estados_civiles_columnas)
+pchs_femeninos_ec_plot7 <- 15:(15 + length(estados_civiles_columnas) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_femenina_ec)),
+     y = conteo_matrix_femenina_ec[, 1],
+     type = "b",
+     xlab = "Nivel de Escolaridad",
+     ylab = "Cantidad de Mujeres",
+     main = "En las mujeres ¿El estado civil influye en el estudio?",
+     xlim = c(min(escolaridad_unicos_femeninos), max(escolaridad_unicos_femeninos)),
+     ylim = c(0, max(conteo_matrix_femenina_ec) * 1.1),
+     col = colores_femeninos_ec_plot7[1],
+     pch = pchs_femeninos_ec_plot7[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = min(escolaridad_unicos_femeninos):max(escolaridad_unicos_femeninos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_femenina_ec) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_femenina_ec)) {
+  lines(x = as.numeric(rownames(conteo_matrix_femenina_ec)),
+        y = conteo_matrix_femenina_ec[, j],
+        col = colores_femeninos_ec_plot7[j],
+        pch = pchs_femeninos_ec_plot7[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = colnames(conteo_matrix_femenina_ec),
+       col = colores_femeninos_ec_plot7,
+       lty = ltys_femeninos_ec_plot7,
+       pch = pchs_femeninos_ec_plot7,
+       lwd = 2,
+       title = "Estado Civil")
+
+
+# --- 8. Gráfico: "En los hombres ¿Tener hijos dificulta el estudio?" ---
+# Matriz: Escolaridad (Filas) x Hijos (Columnas) para HOMBRES
+
+conteo_matrix_masculina <- matrix(0,
+                                  nrow = length(escolaridad_unicos_masculinos),
+                                  ncol = length(hijos_unicos_masculinos),
+                                  dimnames = list(escolaridad_unicos_masculinos, hijos_unicos_masculinos))
+
+for (i in 1:nrow(datos_masculinos)) {
+  hijo_actual <- as.character(datos_masculinos$Hijos[i])
+  escolaridad_actual <- as.character(datos_masculinos$Escolaridad[i])
+  
+  if (hijo_actual %in% dimnames(conteo_matrix_masculina)[[2]] && escolaridad_actual %in% dimnames(conteo_matrix_masculina)[[1]]) {
+    conteo_matrix_masculina[escolaridad_actual, hijo_actual] <- conteo_matrix_masculina[escolaridad_actual, hijo_actual] + 1
+  }
+}
+print(conteo_matrix_masculina)
+
+colores_masculinos_plot8 <- rainbow(length(hijos_unicos_masculinos))
+ltys_masculinos_plot8 <- 1:length(hijos_unicos_masculinos)
+pchs_masculinos_plot8 <- 15:(15 + length(hijos_unicos_masculinos) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_masculina)),
+     y = conteo_matrix_masculina[, 1],
+     type = "b",
+     xlab = "Nivel de Escolaridad",
+     ylab = "Cantidad de Hombres",
+     main = "En los hombres ¿Tener hijos dificulta el estudio?",
+     xlim = c(min(escolaridad_unicos_masculinos), max(escolaridad_unicos_masculinos)),
+     ylim = c(0, max(conteo_matrix_masculina) * 1.1),
+     col = colores_masculinos_plot8[1],
+     pch = pchs_masculinos_plot8[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = min(escolaridad_unicos_masculinos):max(escolaridad_unicos_masculinos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_masculina) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_masculina)) {
+  lines(x = as.numeric(rownames(conteo_matrix_masculina)),
+        y = conteo_matrix_masculina[, j],
+        col = colores_masculinos_plot8[j],
+        pch = pchs_masculinos_plot8[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = paste(hijos_unicos_masculinos, "Hijo(s)"),
+       col = colores_masculinos_plot8,
+       lty = ltys_masculinos_plot8,
+       pch = pchs_masculinos_plot8,
+       lwd = 2,
+       title = "Cantidad de Hijos")
+
+# --- 9. Gráfico: "En las mujeres ¿Tener hijos dificulta el estudio?" ---
+# Matriz: Escolaridad (Filas) x Hijos (Columnas) para MUJERES
+
+conteo_matrix_femenina <- matrix(0,
+                                 nrow = length(escolaridad_unicos_femeninos),
+                                 ncol = length(hijos_unicos_femeninos),
+                                 dimnames = list(escolaridad_unicos_femeninos, hijos_unicos_femeninos))
+
+for (i in 1:nrow(datos_femeninos)) {
+  hijo_actual <- as.character(datos_femeninos$Hijos[i])
+  escolaridad_actual <- as.character(datos_femeninos$Escolaridad[i])
+  
+  if (hijo_actual %in% dimnames(conteo_matrix_femenina)[[2]] && escolaridad_actual %in% dimnames(conteo_matrix_femenina)[[1]]) {
+    conteo_matrix_femenina[escolaridad_actual, hijo_actual] <- conteo_matrix_femenina[escolaridad_actual, hijo_actual] + 1
+  }
+}
+print(conteo_matrix_femenina)
+
+colores_femeninos_plot9 <- rainbow(length(hijos_unicos_femeninos))
+ltys_femeninos_plot9 <- 1:length(hijos_unicos_femeninos)
+pchs_femeninos_plot9 <- 15:(15 + length(hijos_unicos_femeninos) - 1)
+
+plot(x = as.numeric(rownames(conteo_matrix_femenina)),
+     y = conteo_matrix_femenina[, 1],
+     type = "b",
+     xlab = "Nivel de Escolaridad",
+     ylab = "Cantidad de Mujeres",
+     main = "En las mujeres ¿Tener hijos dificulta el estudio?",
+     xlim = c(min(escolaridad_unicos_femeninos), max(escolaridad_unicos_femeninos)),
+     ylim = c(0, max(conteo_matrix_femenina) * 1.1),
+     col = colores_femeninos_plot9[1],
+     pch = pchs_femeninos_plot9[1],
+     lwd = 2,
+     las = 1,
+     xaxt = 'n',
+     yaxt = 'n'
+)
+
+axis(side = 1, at = min(escolaridad_unicos_femeninos):max(escolaridad_unicos_femeninos))
+
+axis(side = 2, at = seq(0, max(conteo_matrix_femenina) * 1.1, by = 1))
+
+for (j in 2:ncol(conteo_matrix_femenina)) {
+  lines(x = as.numeric(rownames(conteo_matrix_femenina)),
+        y = conteo_matrix_femenina[, j],
+        col = colores_femeninos_plot9[j],
+        pch = pchs_femeninos_plot9[j],
+        type = "b",
+        lwd = 2)
+}
+
+legend("topright",
+       legend = paste(hijos_unicos_femeninos, "Hijo(s)"),
+       col = colores_femeninos_plot9,
+       lty = ltys_femeninos_plot9,
+       pch = pchs_femeninos_plot9,
+       lwd = 2,
+       title = "Cantidad de Hijos")
